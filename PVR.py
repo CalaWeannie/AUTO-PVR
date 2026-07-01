@@ -3,7 +3,16 @@ import re
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-# ---------------------- 
+# ----------------------
+# Color Scheme (Airborne Systems)
+# ----------------------
+COLOR_NAVY = "#002F6C"
+COLOR_BLUE = "#005EB8"
+COLOR_LIGHTGRAY = "#E6E6E6"
+COLOR_WHITE = "#FFFFFF"
+COLOR_HOVER = "#004A99"
+
+# ----------------------
 # Directory paths
 # ----------------------
 DRAWING_DIR = r"L:\CONTROLLED PDF's\Drawings"
@@ -28,7 +37,6 @@ def find_latest_revision_pdf(folder, part):
         return None
 
     files = []
-
     for filename in os.listdir(folder):
         if filename.startswith(part) and filename.lower().endswith(".pdf"):
             match = re.search(r"rev[_ -]?([a-z0-9]+)", filename, re.IGNORECASE)
@@ -45,7 +53,7 @@ def find_latest_revision_pdf(folder, part):
 # ----------------------
 # GUI Logic
 # ----------------------
-def open_files():
+def open_files(event=None):
     part = entry_part.get().strip()
     if not part:
         messagebox.showwarning("Input Error", "Please enter a part number.")
@@ -63,7 +71,6 @@ def open_files():
     status_eo.set("Found" if eo_file else "Not Found")
     status_pattern.set("Found" if os.path.exists(pattern_folder) else "Not Found")
 
-    # Open files
     if drawing_file:
         os.startfile(drawing_file)
     if eo_file:
@@ -76,43 +83,109 @@ def open_files():
 # ----------------------
 root = tk.Tk()
 root.title("Auto PVR Lookup Tool")
-root.geometry("420x280")
+root.geometry("500x330")
 root.resizable(False, False)
+root.configure(bg=COLOR_LIGHTGRAY)
 
+# ----------------------
+# Header Bar (No Logo)
+# ----------------------
+header = tk.Frame(root, bg=COLOR_NAVY, height=60)
+header.pack(fill="x")
+
+title = tk.Label(header,
+                 text="Auto PVR Lookup Tool",
+                 font=("Segoe UI", 18, "bold"),
+                 fg=COLOR_WHITE,
+                 bg=COLOR_NAVY)
+title.pack(pady=12)
+
+# ----------------------
+# Rounded Button Style
+# ----------------------
 style = ttk.Style()
 style.theme_use("clam")
 
-# Title Label
-title = ttk.Label(root, text="Auto PVR Lookup Tool", font=("Segoe UI", 14, "bold"))
-title.pack(pady=10)
+style.configure(
+    "RoundedButton.TButton",
+    font=("Segoe UI", 11, "bold"),
+    foreground=COLOR_WHITE,
+    background=COLOR_BLUE,
+    padding=10,
+    relief="flat",
+    borderwidth=0
+)
 
-# Part input frame
-frame_input = ttk.Frame(root)
-frame_input.pack(pady=5)
+style.map(
+    "RoundedButton.TButton",
+    background=[
+        ("active", COLOR_HOVER),
+        ("disabled", "#999999")
+    ]
+)
 
-ttk.Label(frame_input, text="Part Number:").grid(row=0, column=0, padx=5)
-entry_part = ttk.Entry(frame_input, width=30)
+# Hover style
+style.configure("Hover.TButton",
+                background=COLOR_HOVER,
+                foreground=COLOR_WHITE)
+
+# ----------------------
+# Input Section
+# ----------------------
+frame_input = ttk.Frame(root, padding=10)
+frame_input.pack(pady=10)
+
+ttk.Label(frame_input, text="Part Number:",
+          font=("Segoe UI", 11),
+          background=COLOR_LIGHTGRAY).grid(row=0, column=0, padx=5)
+
+entry_part = ttk.Entry(frame_input, width=34)
 entry_part.grid(row=0, column=1, padx=5)
+entry_part.bind("<Return>", open_files)  # PRESS ENTER TO SEARCH
 
-# Open button
-btn_open = ttk.Button(root, text="Open Files", command=open_files)
+# ----------------------
+# Open Button with Hover
+# ----------------------
+def on_enter(e):
+    btn_open.configure(style="Hover.TButton")
+def on_leave(e):
+    btn_open.configure(style="RoundedButton.TButton")
+
+btn_open = ttk.Button(root, text="Open Files",
+                      command=open_files,
+                      style="RoundedButton.TButton")
 btn_open.pack(pady=10)
 
-# Status Frame
-frame_status = ttk.LabelFrame(root, text="Status")
-frame_status.pack(padx=10, pady=10, fill="both")
+btn_open.bind("<Enter>", on_enter)
+btn_open.bind("<Leave>", on_leave)
+
+# ----------------------
+# Status Section
+# ----------------------
+frame_status = tk.LabelFrame(root, text="Status",
+                             bg=COLOR_LIGHTGRAY,
+                             fg=COLOR_NAVY,
+                             font=("Segoe UI", 11, "bold"),
+                             padx=10, pady=10)
+frame_status.pack(padx=15, pady=10, fill="both")
 
 status_drawing = tk.StringVar(value="Waiting…")
 status_eo = tk.StringVar(value="Waiting…")
 status_pattern = tk.StringVar(value="Waiting…")
 
-ttk.Label(frame_status, text="Drawing PDF:").grid(row=0, column=0, sticky="w", padx=5, pady=2)
-ttk.Label(frame_status, textvariable=status_drawing).grid(row=0, column=1, sticky="w")
+ttk.Label(frame_status, text="Drawing PDF:",
+          background=COLOR_LIGHTGRAY).grid(row=0, column=0, sticky="w", pady=5)
+ttk.Label(frame_status, textvariable=status_drawing,
+          background=COLOR_LIGHTGRAY).grid(row=0, column=1, sticky="w")
 
-ttk.Label(frame_status, text="EO PDF:").grid(row=1, column=0, sticky="w", padx=5, pady=2)
-ttk.Label(frame_status, textvariable=status_eo).grid(row=1, column=1, sticky="w")
+ttk.Label(frame_status, text="EO PDF:",
+          background=COLOR_LIGHTGRAY).grid(row=1, column=0, sticky="w", pady=5)
+ttk.Label(frame_status, textvariable=status_eo,
+          background=COLOR_LIGHTGRAY).grid(row=1, column=1, sticky="w")
 
-ttk.Label(frame_status, text="Pattern Folder:").grid(row=2, column=0, sticky="w", padx=5, pady=2)
-ttk.Label(frame_status, textvariable=status_pattern).grid(row=2, column=1, sticky="w")
+ttk.Label(frame_status, text="Pattern Folder:",
+          background=COLOR_LIGHTGRAY).grid(row=2, column=0, sticky="w", pady=5)
+ttk.Label(frame_status, textvariable=status_pattern,
+          background=COLOR_LIGHTGRAY).grid(row=2, column=1, sticky="w")
 
 root.mainloop()
