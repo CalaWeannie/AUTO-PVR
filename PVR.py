@@ -116,7 +116,7 @@ style.configure(
     font=("Segoe UI", 11, "bold"),
     foreground=COLOR_WHITE,
     background=COLOR_BLUE,
-    padding=10,
+    padding=3,
     relief="flat",
     borderwidth=0
 )
@@ -137,12 +137,14 @@ style.configure("Hover.TButton",
 # ----------------------
 # Input Section
 # ----------------------
-frame_input = ttk.Frame(root, padding=10)
+frame_input = tk.Frame(root, bg=COLOR_LIGHTGRAY)
 frame_input.pack(pady=10)
 
 ttk.Label(frame_input, text="Part Number:",
           font=("Segoe UI", 11),
           background=COLOR_LIGHTGRAY).grid(row=0, column=0, padx=5)
+
+
 
 entry_part = ttk.Entry(frame_input, width=34)
 entry_part.grid(row=0, column=1, padx=5)
@@ -159,7 +161,7 @@ def on_leave(e):
 btn_open = ttk.Button(root, text="Open Files",
                       command=open_files,
                       style="RoundedButton.TButton")
-btn_open.pack(pady=10)
+btn_open.pack(padx=1, pady=10)
 
 btn_open.bind("<Enter>", on_enter)
 btn_open.bind("<Leave>", on_leave)
