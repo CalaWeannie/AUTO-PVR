@@ -18,6 +18,7 @@ COLOR_HOVER = "#004A99"
 DRAWING_DIR = r"L:\CONTROLLED PDF's\Drawings"
 EO_DIR = r"L:\CONTROLLED PDF's\EO's and Deviation-Waivers\Drawings"
 PATTERN_DIR = r"G:\Operations\Industrial Engineering Dept\Patterns Approval Log\Patterns\MANUFACTURING'S PATTERNS & JIGS 01"
+PVR_DIR = r"G:\Operations\Cutting Dept\Pattern Buy Offs (PVR)\Pattern Verification Records"
 
 # ----------------------
 # Revision logic
@@ -63,6 +64,7 @@ def open_files(event=None):
     drawing_subfolder = os.path.join(DRAWING_DIR, first_three)
     eo_subfolder = os.path.join(EO_DIR, first_three)
     pattern_folder = os.path.join(PATTERN_DIR, part)
+    pvr_folder = os.path.join(PVR_DIR, part)
 
     drawing_file = find_latest_revision_pdf(drawing_subfolder, part)
     eo_file = find_latest_revision_pdf(eo_subfolder, part)
@@ -70,6 +72,7 @@ def open_files(event=None):
     status_drawing.set("Found" if drawing_file else "Not Found")
     status_eo.set("Found" if eo_file else "Not Found")
     status_pattern.set("Found" if os.path.exists(pattern_folder) else "Not Found")
+    status_pvr.set("Found" if os.path.exists(pvr_folder) else "Not Found")
 
     if drawing_file:
         os.startfile(drawing_file)
@@ -77,13 +80,15 @@ def open_files(event=None):
         os.startfile(eo_file)
     if os.path.exists(pattern_folder):
         os.startfile(pattern_folder)
+    if os.path.exists(pvr_folder):
+        os.startfile(pvr_folder)
 
 # ----------------------
 # Build GUI
 # ----------------------
 root = tk.Tk()
 root.title("Auto PVR Lookup Tool")
-root.geometry("500x330")
+root.geometry("500x350")
 root.resizable(False, False)
 root.configure(bg=COLOR_LIGHTGRAY)
 
@@ -166,13 +171,13 @@ frame_status = tk.LabelFrame(root, text="Status",
                              bg=COLOR_LIGHTGRAY,
                              fg=COLOR_NAVY,
                              font=("Segoe UI", 11, "bold"),
-                             padx=10, pady=10)
-frame_status.pack(padx=15, pady=10, fill="both")
+                             padx=10, pady=5)
+frame_status.pack(padx=15, pady=5, fill="both")
 
 status_drawing = tk.StringVar(value="Waiting…")
 status_eo = tk.StringVar(value="Waiting…")
 status_pattern = tk.StringVar(value="Waiting…")
-
+status_pvr = tk.StringVar(value="Waiting…")
 ttk.Label(frame_status, text="Drawing PDF:",
           background=COLOR_LIGHTGRAY).grid(row=0, column=0, sticky="w", pady=5)
 ttk.Label(frame_status, textvariable=status_drawing,
@@ -187,5 +192,10 @@ ttk.Label(frame_status, text="Pattern Folder:",
           background=COLOR_LIGHTGRAY).grid(row=2, column=0, sticky="w", pady=5)
 ttk.Label(frame_status, textvariable=status_pattern,
           background=COLOR_LIGHTGRAY).grid(row=2, column=1, sticky="w")
+
+ttk.Label(frame_status, text="PVR Folder:",
+          background=COLOR_LIGHTGRAY).grid(row=3, column=0, sticky="w", pady=5)
+ttk.Label(frame_status, textvariable=status_pvr,
+          background=COLOR_LIGHTGRAY).grid(row=3, column=1, sticky="w")
 
 root.mainloop()
