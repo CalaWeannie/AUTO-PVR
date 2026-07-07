@@ -163,19 +163,72 @@ def find_latest_revision_pdf(folder, part):
     return os.path.join(folder, files[-1][1])
 
 
-def search_pdf_revision(item_key, part_number):
+def pdf_search_folders(base_dir, part_number):
+    """Return candidate folders to search, most specific first."""
+    folders = [os.path.join(base_dir, part_number[:3]), base_dir]
+    seen = set()
+    ordered = []
+    for folder in folders:
+        normalized = os.path.normcase(os.path.normpath(folder))
+        if normalized not in seen:
+            seen.add(normalized)
+            ordered.append(folder)
+    return ordered
+
+
+def search_pdf_revision(item_key, part_number, log=None):
     """Search for part folder → highest rev PDF inside."""
     item = SEARCH_ITEMS[item_key]
     base_dir = item["path"]
-    folder = os.path.join(base_dir, part_number[:3])
-    return find_latest_revision_pdf(folder, part_number) if os.path.exists(folder) else None
+
+    if not base_dir:
+        if log:
+            log("  No directory configured.")
+        return None
+
+    if not os.path.exists(base_dir):
+        if log:
+            log(f"  Base directory not found: {base_dir}")
+        return None
+
+    for folder in pdf_search_folders(base_dir, part_number):
+        if not os.path.exists(folder):
+            if log:
+                log(f"  Checked (missing): {folder}")
+            continue
+
+        result = find_latest_revision_pdf(folder, part_number)
+        if result:
+            return result
+
+        if log:
+            log(f"  Checked (no match): {folder}")
+
+    return None
 
 
-def search_folder(item_key, part_number):
+def search_folder(item_key, part_number, log=None):
     """Look for folder matching part number exactly."""
     item = SEARCH_ITEMS[item_key]
-    full_path = os.path.join(item["path"], part_number)
-    return full_path if os.path.exists(full_path) else None
+    base_dir = item["path"]
+
+    if not base_dir:
+        if log:
+            log("  No directory configured.")
+        return None
+
+    if not os.path.exists(base_dir):
+        if log:
+            log(f"  Base directory not found: {base_dir}")
+        return None
+
+    full_path = os.path.join(base_dir, part_number)
+    if os.path.exists(full_path):
+        return full_path
+
+    if log:
+        log(f"  Checked (missing): {full_path}")
+    return None
 
 
 def search_syspro_placeholder(item_key, part_number):
@@ -183,21 +236,32 @@ def search_syspro_placeholder(item_key, part_number):
     return None
 
 
-def run_search(item_key, part_number):
+def run_search(item_key, part_number, log=None):
     """Dispatch search depending on item type."""
     item = SEARCH_ITEMS[item_key]
     t = item["type"]
 
     if t == "pdf_revision":
-        return search_pdf_revision(item_key, part_number)
+        return search_pdf_revision(item_key, part_number, log=log)
 
     if t == "folder":
-        return search_folder(item_key, part_number)
+        return search_folder(item_key, part_number, log=log)
 
     if t == "syspro_lookup":
         return search_syspro_placeholder(item_key, part_number)
 
     return None
+
+def open_path(path):
+    """Open a file or folder with the system default application."""
+    if not path or not os.path.exists(path):
+        return False
+    try:
+        os.startfile(os.path.normpath(path))
+        return True
+    except OSError as e:
+        add_log(f"Failed to open: {path} ({e})")
+        return False
 
 # ------------------------------------------------------------
 # THEME ENGINE CLASS
@@ -218,6 +282,7 @@ class ThemeEngine:
         self.themable_text_widgets = []
         self.themable_labelframes = []
         self.themable_checkboxes = []
+        self.themable_tk_labels = []
 
     def apply_theme(self):
         """Apply the active theme across all registered widgets."""
@@ -247,6 +312,10 @@ class ThemeEngine:
         # Labels
         for lbl in self.themable_labels:
             lbl.configure(style="Custom.TLabel")
+
+        # tk.Label widgets (status colors, etc.)
+        for lbl in self.themable_tk_labels:
+            lbl.configure(bg=bg)
 
         # Entry boxes
         for entry in self.themable_entries:
@@ -469,9 +538,15 @@ for key, item in SEARCH_ITEMS.items():
     lbl_name.grid(row=row, column=0, sticky="w", padx=5, pady=3)
     theme_engine.themable_labels.append(lbl_name)
 
-    lbl_status = ttk.Label(frame_status, textvariable=status_vars[key], style="Custom.TLabel")
+    lbl_status = tk.Label(
+        frame_status,
+        textvariable=status_vars[key],
+        font=DEFAULT_FONT,
+        anchor="w",
+        bg=LIGHT_BG
+    )
     lbl_status.grid(row=row, column=1, sticky="w", padx=5, pady=3)
-    theme_engine.themable_labels.append(lbl_status)
+    theme_engine.themable_tk_labels.append(lbl_status)
 
     status_labels[key] = lbl_status
     row += 1
@@ -521,7 +596,10 @@ def add_log(message):
 # -------------------------------
 def update_status(key, new_text, color):
     status_vars[key].set(new_text)
-    animate_status_label(status_labels[key], color)
+    try:
+        animate_status_label(status_labels[key], color)
+    except tk.TclError:
+        pass
 
 
 # -------------------------------
@@ -553,19 +631,13 @@ def perform_search(event=None):
         if var.get():
             update_status(key, "searching...", STATUS_WAITING)
             add_log(f"Searching {label}...")
-
-            result = run_search(key, part)
+            result = run_search(key, part, log=add_log)
 
             if result:
                 update_status(key, "Found", STATUS_FOUND)
-                add_log(f"✔ {label} FOUND")
-
-                # Try to open file if it's a path
-                try:
-                    if os.path.exists(result):
-                        os.startfile(result)
-                except Exception:
-                    pass
+                add_log(f"✔ {label} FOUND: {result}")
+                if open_path(result):
+                    add_log(f"Opened {label}")
             else:
                 update_status(key, "Not Found", STATUS_NOT_FOUND)
                 add_log(f"✘ {label} NOT FOUND")
