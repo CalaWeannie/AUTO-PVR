@@ -718,33 +718,38 @@ drawings_path_var = tk.StringVar(value=DRAWING_DIR)
 eo_path_var = tk.StringVar(value=EO_DIR)
 patterns_path_var = tk.StringVar(value=PATTERN_DIR)
 
-def entry_field(parent, label_text, var):
+def entry_field(parent, label_text, var, on_blur=None):
     lbl = ttk.Label(parent, text=label_text, style="Custom.TLabel")
     ent = ttk.Entry(parent, textvariable=var, width=70, font=DEFAULT_FONT)
     lbl.pack(anchor="w", pady=2)
     ent.pack(anchor="w", pady=(0, 5))
     theme_engine.themable_labels.append(lbl)
     theme_engine.themable_entries.append(ent)
-
-entry_field(paths_frame, "Drawings Directory:", drawings_path_var)
-entry_field(paths_frame, "EO Directory:", eo_path_var)
-entry_field(paths_frame, "Patterns Directory:", patterns_path_var)
+    if on_blur:
+        ent.bind("<FocusOut>", lambda e: on_blur())
+    return ent
 
 # -------------------------------
-# SAVE SETTINGS
+# SAVE SETTINGS (auto-saved on blur)
 # -------------------------------
 def save_settings():
     global DRAWING_DIR, EO_DIR, PATTERN_DIR
 
-    DRAWING_DIR = drawings_path_var.get().strip()
-    EO_DIR = eo_path_var.get().strip()
-    PATTERN_DIR = patterns_path_var.get().strip()
+    new_drawing = drawings_path_var.get().strip()
+    new_eo = eo_path_var.get().strip()
+    new_pattern = patterns_path_var.get().strip()
+
+    if (new_drawing == DRAWING_DIR and new_eo == EO_DIR and new_pattern == PATTERN_DIR):
+        return
+
+    DRAWING_DIR = new_drawing
+    EO_DIR = new_eo
+    PATTERN_DIR = new_pattern
 
     SEARCH_ITEMS["drawing_pdf"]["path"] = DRAWING_DIR
     SEARCH_ITEMS["eo_pdf"]["path"] = EO_DIR
     SEARCH_ITEMS["pattern_folder"]["path"] = PATTERN_DIR
 
-    # Write to settings.ini
     config["paths"] = {
         "drawings_dir": DRAWING_DIR,
         "eo_dir": EO_DIR,
@@ -758,8 +763,10 @@ def save_settings():
     lbl_dir3.configure(text=f"Patterns Directory:\n{PATTERN_DIR}")
 
     add_log("Settings saved.")
-    messagebox.showinfo("Settings Saved", "Directory paths updated successfully.")
 
+entry_field(paths_frame, "Drawings Directory:", drawings_path_var, on_blur=save_settings)
+entry_field(paths_frame, "EO Directory:", eo_path_var, on_blur=save_settings)
+entry_field(paths_frame, "Patterns Directory:", patterns_path_var, on_blur=save_settings)
 
 # -------------------------------
 # RESTORE DEFAULT SETTINGS
@@ -768,18 +775,9 @@ def reset_settings():
     drawings_path_var.set(DEFAULT_DRAWING_DIR)
     eo_path_var.set(DEFAULT_EO_DIR)
     patterns_path_var.set(DEFAULT_PATTERN_DIR)
+    save_settings()
     add_log("Default directory paths restored.")
     messagebox.showinfo("Defaults Restored", "Default paths have been restored.")
-
-
-btn_save_settings = ttk.Button(
-    settings_frame,
-    text="Save Settings",
-    style="Accent.TButton",
-    command=save_settings
-)
-btn_save_settings.pack(anchor="w", pady=5)
-theme_engine.themable_buttons.append(btn_save_settings)
 
 btn_reset_settings = ttk.Button(
     settings_frame,
@@ -863,6 +861,7 @@ def save_checkbox_preferences():
 # ============================================================
 
 def on_close():
+    save_settings()
     save_checkbox_preferences()
     add_log("Preferences saved. Exiting application.")
     root.destroy()
