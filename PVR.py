@@ -9,7 +9,7 @@ import re
 import json
 import configparser
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
 
 # ============================================================
@@ -718,13 +718,38 @@ drawings_path_var = tk.StringVar(value=DRAWING_DIR)
 eo_path_var = tk.StringVar(value=EO_DIR)
 patterns_path_var = tk.StringVar(value=PATTERN_DIR)
 
+def browse_directory(var, on_change=None):
+    initial = var.get().strip()
+    if not initial or not os.path.isdir(initial):
+        initial = os.path.expanduser("~")
+    selected = filedialog.askdirectory(
+        parent=root,
+        title="Select Directory",
+        initialdir=initial
+    )
+    if selected:
+        var.set(selected)
+        if on_change:
+            on_change()
+
 def entry_field(parent, label_text, var, on_blur=None):
     lbl = ttk.Label(parent, text=label_text, style="Custom.TLabel")
-    ent = ttk.Entry(parent, textvariable=var, width=70, font=DEFAULT_FONT)
+    row = ttk.Frame(parent, style="Custom.TFrame")
+    ent = ttk.Entry(row, textvariable=var, width=60, font=DEFAULT_FONT)
+    btn = ttk.Button(
+        row,
+        text="Browse...",
+        style="Accent.TButton",
+        command=lambda: browse_directory(var, on_blur)
+    )
     lbl.pack(anchor="w", pady=2)
-    ent.pack(anchor="w", pady=(0, 5))
+    row.pack(anchor="w", pady=(0, 5), fill="x")
+    ent.pack(side="left", fill="x", expand=True)
+    btn.pack(side="left", padx=(8, 0))
     theme_engine.themable_labels.append(lbl)
+    theme_engine.themable_frames.append(row)
     theme_engine.themable_entries.append(ent)
+    theme_engine.themable_buttons.append(btn)
     if on_blur:
         ent.bind("<FocusOut>", lambda e: on_blur())
     return ent
