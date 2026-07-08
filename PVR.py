@@ -52,6 +52,7 @@ STATUS_WAITING = "#666666"
 DEFAULT_DRAWING_DIR = r"L:\\CONTROLLED PDF's\\Drawings"
 DEFAULT_EO_DIR = r"L:\\CONTROLLED PDF's\\EO's and Deviation-Waivers\\Drawings"
 DEFAULT_PATTERN_DIR = r"G:\\Operations\\Industrial Engineering Dept\\Patterns Approval Log\\Patterns\\MANUFACTURING'S PATTERNS & JIGS 01"
+DEFAULT_PVR_DIR = r"G:\Operations\Cutting Dept\Pattern Buy Offs (PVR)\Pattern Verification Records"
 
 # ============================================================
 # CONFIG FILE LOADING (settings.ini)
@@ -63,10 +64,12 @@ if os.path.exists("settings.ini"):
     DRAWING_DIR = config["paths"].get("drawings_dir", DEFAULT_DRAWING_DIR)
     EO_DIR = config["paths"].get("eo_dir", DEFAULT_EO_DIR)
     PATTERN_DIR = config["paths"].get("patterns_dir", DEFAULT_PATTERN_DIR)
+    PVR_DIR = config["paths"].get("pvr_dir", DEFAULT_PVR_DIR)
 else:
     DRAWING_DIR = DEFAULT_DRAWING_DIR
     EO_DIR = DEFAULT_EO_DIR
     PATTERN_DIR = DEFAULT_PATTERN_DIR
+    PVR_DIR = DEFAULT_PVR_DIR
 
 # ============================================================
 # USER CHECKBOX PREFERENCES (preferences.json)
@@ -126,14 +129,14 @@ SEARCH_ITEMS = {
         "enabled": False,
         "path": None
     },
-    "posys": {
-        "label": "POSYS Info",
-        "type": "syspro_lookup",
+    "PVR_folder": {
+        "label": "PVR Folder",
+        "type": "folder",
         "enabled": False,
-        "path": None
+        "path": PVR_DIR
     },
-    "pro_info": {
-        "label": "PRO Info",
+    "PO_file": {
+        "label": "PO Info",
         "type": "syspro_lookup",
         "enabled": False,
         "path": None
