@@ -9,7 +9,7 @@ import re
 import json
 import configparser
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
 
 # ============================================================
@@ -52,6 +52,8 @@ STATUS_WAITING = "#666666"
 DEFAULT_DRAWING_DIR = r"L:\\CONTROLLED PDF's\\Drawings"
 DEFAULT_EO_DIR = r"L:\\CONTROLLED PDF's\\EO's and Deviation-Waivers\\Drawings"
 DEFAULT_PATTERN_DIR = r"G:\\Operations\\Industrial Engineering Dept\\Patterns Approval Log\\Patterns\\MANUFACTURING'S PATTERNS & JIGS 01"
+DEFAULT_PVR_DIR = r"G:\Operations\Cutting Dept\Pattern Buy Offs (PVR)\Pattern Verification Records"
+DEFAULT_IWO_DIR = r"c:\Engineering Document Control\Document Control\IWO Files"
 
 # ============================================================
 # CONFIG FILE LOADING (settings.ini)
@@ -63,10 +65,15 @@ if os.path.exists("settings.ini"):
     DRAWING_DIR = config["paths"].get("drawings_dir", DEFAULT_DRAWING_DIR)
     EO_DIR = config["paths"].get("eo_dir", DEFAULT_EO_DIR)
     PATTERN_DIR = config["paths"].get("patterns_dir", DEFAULT_PATTERN_DIR)
+    PVR_DIR = config["paths"].get("pvr_dir", DEFAULT_PVR_DIR)
+    IWO_DIR = config["paths"].get("IWO_DIR", DEFAULT_IWO_DIR)
+
 else:
     DRAWING_DIR = DEFAULT_DRAWING_DIR
     EO_DIR = DEFAULT_EO_DIR
     PATTERN_DIR = DEFAULT_PATTERN_DIR
+    PVR_DIR = DEFAULT_PVR_DIR
+    IWO_DIR = DEFAULT_IWO_DIR
 
 # ============================================================
 # USER CHECKBOX PREFERENCES (preferences.json)
@@ -120,20 +127,20 @@ SEARCH_ITEMS = {
         "enabled": False,
         "path": PATTERN_DIR
     },
-    "iwo": {
-        "label": "IWO",
-        "type": "syspro_lookup",
+    "PVR_folder": {
+        "label": "PVR Folder",
+        "type": "folder",
         "enabled": False,
-        "path": None
+        "path": PVR_DIR
     },
-    "posys": {
-        "label": "POSYS Info",
-        "type": "syspro_lookup",
+    "IWO_folder": {
+        "label": "IWO Info",
+        "type": "folder",
         "enabled": False,
-        "path": None
+        "path": IWO_DIR
     },
-    "pro_info": {
-        "label": "PRO Info",
+    "PO_file": {
+        "label": "PO Info",
         "type": "syspro_lookup",
         "enabled": False,
         "path": None
@@ -163,19 +170,72 @@ def find_latest_revision_pdf(folder, part):
     return os.path.join(folder, files[-1][1])
 
 
-def search_pdf_revision(item_key, part_number):
+def pdf_search_folders(base_dir, part_number):
+    """Return candidate folders to search, most specific first."""
+    folders = [os.path.join(base_dir, part_number[:3]), base_dir]
+    seen = set()
+    ordered = []
+    for folder in folders:
+        normalized = os.path.normcase(os.path.normpath(folder))
+        if normalized not in seen:
+            seen.add(normalized)
+            ordered.append(folder)
+    return ordered
+
+
+def search_pdf_revision(item_key, part_number, log=None):
     """Search for part folder → highest rev PDF inside."""
     item = SEARCH_ITEMS[item_key]
     base_dir = item["path"]
-    folder = os.path.join(base_dir, part_number[:3])
-    return find_latest_revision_pdf(folder, part_number) if os.path.exists(folder) else None
+
+    if not base_dir:
+        if log:
+            log("  No directory configured.")
+        return None
+
+    if not os.path.exists(base_dir):
+        if log:
+            log(f"  Base directory not found: {base_dir}")
+        return None
+
+    for folder in pdf_search_folders(base_dir, part_number):
+        if not os.path.exists(folder):
+            if log:
+                log(f"  Checked (missing): {folder}")
+            continue
+
+        result = find_latest_revision_pdf(folder, part_number)
+        if result:
+            return result
+
+        if log:
+            log(f"  Checked (no match): {folder}")
+
+    return None
 
 
-def search_folder(item_key, part_number):
+def search_folder(item_key, part_number, log=None):
     """Look for folder matching part number exactly."""
     item = SEARCH_ITEMS[item_key]
-    full_path = os.path.join(item["path"], part_number)
-    return full_path if os.path.exists(full_path) else None
+    base_dir = item["path"]
+
+    if not base_dir:
+        if log:
+            log("  No directory configured.")
+        return None
+
+    if not os.path.exists(base_dir):
+        if log:
+            log(f"  Base directory not found: {base_dir}")
+        return None
+
+    full_path = os.path.join(base_dir, part_number)
+    if os.path.exists(full_path):
+        return full_path
+
+    if log:
+        log(f"  Checked (missing): {full_path}")
+    return None
 
 
 def search_syspro_placeholder(item_key, part_number):
@@ -183,21 +243,32 @@ def search_syspro_placeholder(item_key, part_number):
     return None
 
 
-def run_search(item_key, part_number):
+def run_search(item_key, part_number, log=None):
     """Dispatch search depending on item type."""
     item = SEARCH_ITEMS[item_key]
     t = item["type"]
 
     if t == "pdf_revision":
-        return search_pdf_revision(item_key, part_number)
+        return search_pdf_revision(item_key, part_number, log=log)
 
     if t == "folder":
-        return search_folder(item_key, part_number)
+        return search_folder(item_key, part_number, log=log)
 
     if t == "syspro_lookup":
         return search_syspro_placeholder(item_key, part_number)
 
     return None
+
+def open_path(path):
+    """Open a file or folder with the system default application."""
+    if not path or not os.path.exists(path):
+        return False
+    try:
+        os.startfile(os.path.normpath(path))
+        return True
+    except OSError as e:
+        add_log(f"Failed to open: {path} ({e})")
+        return False
 
 # ------------------------------------------------------------
 # THEME ENGINE CLASS
@@ -218,6 +289,7 @@ class ThemeEngine:
         self.themable_text_widgets = []
         self.themable_labelframes = []
         self.themable_checkboxes = []
+        self.themable_tk_labels = []
 
     def apply_theme(self):
         """Apply the active theme across all registered widgets."""
@@ -247,6 +319,10 @@ class ThemeEngine:
         # Labels
         for lbl in self.themable_labels:
             lbl.configure(style="Custom.TLabel")
+
+        # tk.Label widgets (status colors, etc.)
+        for lbl in self.themable_tk_labels:
+            lbl.configure(bg=bg)
 
         # Entry boxes
         for entry in self.themable_entries:
@@ -469,9 +545,15 @@ for key, item in SEARCH_ITEMS.items():
     lbl_name.grid(row=row, column=0, sticky="w", padx=5, pady=3)
     theme_engine.themable_labels.append(lbl_name)
 
-    lbl_status = ttk.Label(frame_status, textvariable=status_vars[key], style="Custom.TLabel")
+    lbl_status = tk.Label(
+        frame_status,
+        textvariable=status_vars[key],
+        font=DEFAULT_FONT,
+        anchor="w",
+        bg=LIGHT_BG
+    )
     lbl_status.grid(row=row, column=1, sticky="w", padx=5, pady=3)
-    theme_engine.themable_labels.append(lbl_status)
+    theme_engine.themable_tk_labels.append(lbl_status)
 
     status_labels[key] = lbl_status
     row += 1
@@ -521,7 +603,10 @@ def add_log(message):
 # -------------------------------
 def update_status(key, new_text, color):
     status_vars[key].set(new_text)
-    animate_status_label(status_labels[key], color)
+    try:
+        animate_status_label(status_labels[key], color)
+    except tk.TclError:
+        pass
 
 
 # -------------------------------
@@ -553,19 +638,13 @@ def perform_search(event=None):
         if var.get():
             update_status(key, "searching...", STATUS_WAITING)
             add_log(f"Searching {label}...")
-
-            result = run_search(key, part)
+            result = run_search(key, part, log=add_log)
 
             if result:
                 update_status(key, "Found", STATUS_FOUND)
-                add_log(f"✔ {label} FOUND")
-
-                # Try to open file if it's a path
-                try:
-                    if os.path.exists(result):
-                        os.startfile(result)
-                except Exception:
-                    pass
+                add_log(f"✔ {label} FOUND: {result}")
+                if open_path(result):
+                    add_log(f"Opened {label}")
             else:
                 update_status(key, "Not Found", STATUS_NOT_FOUND)
                 add_log(f"✘ {label} NOT FOUND")
@@ -718,33 +797,63 @@ drawings_path_var = tk.StringVar(value=DRAWING_DIR)
 eo_path_var = tk.StringVar(value=EO_DIR)
 patterns_path_var = tk.StringVar(value=PATTERN_DIR)
 
-def entry_field(parent, label_text, var):
-    lbl = ttk.Label(parent, text=label_text, style="Custom.TLabel")
-    ent = ttk.Entry(parent, textvariable=var, width=70, font=DEFAULT_FONT)
-    lbl.pack(anchor="w", pady=2)
-    ent.pack(anchor="w", pady=(0, 5))
-    theme_engine.themable_labels.append(lbl)
-    theme_engine.themable_entries.append(ent)
+def browse_directory(var, on_change=None):
+    initial = var.get().strip()
+    if not initial or not os.path.isdir(initial):
+        initial = os.path.expanduser("~")
+    selected = filedialog.askdirectory(
+        parent=root,
+        title="Select Directory",
+        initialdir=initial
+    )
+    if selected:
+        var.set(selected)
+        if on_change:
+            on_change()
 
-entry_field(paths_frame, "Drawings Directory:", drawings_path_var)
-entry_field(paths_frame, "EO Directory:", eo_path_var)
-entry_field(paths_frame, "Patterns Directory:", patterns_path_var)
+def entry_field(parent, label_text, var, on_blur=None):
+    lbl = ttk.Label(parent, text=label_text, style="Custom.TLabel")
+    row = ttk.Frame(parent, style="Custom.TFrame")
+    ent = ttk.Entry(row, textvariable=var, width=60, font=DEFAULT_FONT)
+    btn = ttk.Button(
+        row,
+        text="Browse...",
+        style="Accent.TButton",
+        command=lambda: browse_directory(var, on_blur)
+    )
+    lbl.pack(anchor="w", pady=2)
+    row.pack(anchor="w", pady=(0, 5), fill="x")
+    ent.pack(side="left", fill="x", expand=True)
+    btn.pack(side="left", padx=(8, 0))
+    theme_engine.themable_labels.append(lbl)
+    theme_engine.themable_frames.append(row)
+    theme_engine.themable_entries.append(ent)
+    theme_engine.themable_buttons.append(btn)
+    if on_blur:
+        ent.bind("<FocusOut>", lambda e: on_blur())
+    return ent
 
 # -------------------------------
-# SAVE SETTINGS
+# SAVE SETTINGS (auto-saved on blur)
 # -------------------------------
 def save_settings():
     global DRAWING_DIR, EO_DIR, PATTERN_DIR
 
-    DRAWING_DIR = drawings_path_var.get().strip()
-    EO_DIR = eo_path_var.get().strip()
-    PATTERN_DIR = patterns_path_var.get().strip()
+    new_drawing = drawings_path_var.get().strip()
+    new_eo = eo_path_var.get().strip()
+    new_pattern = patterns_path_var.get().strip()
+
+    if (new_drawing == DRAWING_DIR and new_eo == EO_DIR and new_pattern == PATTERN_DIR):
+        return
+
+    DRAWING_DIR = new_drawing
+    EO_DIR = new_eo
+    PATTERN_DIR = new_pattern
 
     SEARCH_ITEMS["drawing_pdf"]["path"] = DRAWING_DIR
     SEARCH_ITEMS["eo_pdf"]["path"] = EO_DIR
     SEARCH_ITEMS["pattern_folder"]["path"] = PATTERN_DIR
 
-    # Write to settings.ini
     config["paths"] = {
         "drawings_dir": DRAWING_DIR,
         "eo_dir": EO_DIR,
@@ -758,8 +867,10 @@ def save_settings():
     lbl_dir3.configure(text=f"Patterns Directory:\n{PATTERN_DIR}")
 
     add_log("Settings saved.")
-    messagebox.showinfo("Settings Saved", "Directory paths updated successfully.")
 
+entry_field(paths_frame, "Drawings Directory:", drawings_path_var, on_blur=save_settings)
+entry_field(paths_frame, "EO Directory:", eo_path_var, on_blur=save_settings)
+entry_field(paths_frame, "Patterns Directory:", patterns_path_var, on_blur=save_settings)
 
 # -------------------------------
 # RESTORE DEFAULT SETTINGS
@@ -768,18 +879,9 @@ def reset_settings():
     drawings_path_var.set(DEFAULT_DRAWING_DIR)
     eo_path_var.set(DEFAULT_EO_DIR)
     patterns_path_var.set(DEFAULT_PATTERN_DIR)
+    save_settings()
     add_log("Default directory paths restored.")
     messagebox.showinfo("Defaults Restored", "Default paths have been restored.")
-
-
-btn_save_settings = ttk.Button(
-    settings_frame,
-    text="Save Settings",
-    style="Accent.TButton",
-    command=save_settings
-)
-btn_save_settings.pack(anchor="w", pady=5)
-theme_engine.themable_buttons.append(btn_save_settings)
 
 btn_reset_settings = ttk.Button(
     settings_frame,
@@ -863,6 +965,7 @@ def save_checkbox_preferences():
 # ============================================================
 
 def on_close():
+    save_settings()
     save_checkbox_preferences()
     add_log("Preferences saved. Exiting application.")
     root.destroy()
