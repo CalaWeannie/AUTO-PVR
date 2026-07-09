@@ -53,6 +53,7 @@ DEFAULT_DRAWING_DIR = r"L:\\CONTROLLED PDF's\\Drawings"
 DEFAULT_EO_DIR = r"L:\\CONTROLLED PDF's\\EO's and Deviation-Waivers\\Drawings"
 DEFAULT_PATTERN_DIR = r"G:\\Operations\\Industrial Engineering Dept\\Patterns Approval Log\\Patterns\\MANUFACTURING'S PATTERNS & JIGS 01"
 DEFAULT_PVR_DIR = r"G:\Operations\Cutting Dept\Pattern Buy Offs (PVR)\Pattern Verification Records"
+DEFAULT_IWO_DIR = r"c:\Engineering Document Control\Document Control\IWO Files"
 
 # ============================================================
 # CONFIG FILE LOADING (settings.ini)
@@ -65,11 +66,14 @@ if os.path.exists("settings.ini"):
     EO_DIR = config["paths"].get("eo_dir", DEFAULT_EO_DIR)
     PATTERN_DIR = config["paths"].get("patterns_dir", DEFAULT_PATTERN_DIR)
     PVR_DIR = config["paths"].get("pvr_dir", DEFAULT_PVR_DIR)
+    IWO_DIR = config["paths"].get("IWO_DIR", DEFAULT_IWO_DIR)
+
 else:
     DRAWING_DIR = DEFAULT_DRAWING_DIR
     EO_DIR = DEFAULT_EO_DIR
     PATTERN_DIR = DEFAULT_PATTERN_DIR
     PVR_DIR = DEFAULT_PVR_DIR
+    IWO_DIR = DEFAULT_IWO_DIR
 
 # ============================================================
 # USER CHECKBOX PREFERENCES (preferences.json)
@@ -123,17 +127,17 @@ SEARCH_ITEMS = {
         "enabled": False,
         "path": PATTERN_DIR
     },
-    "iwo": {
-        "label": "IWO",
-        "type": "syspro_lookup",
-        "enabled": False,
-        "path": None
-    },
     "PVR_folder": {
         "label": "PVR Folder",
         "type": "folder",
         "enabled": False,
         "path": PVR_DIR
+    },
+    "IWO_folder": {
+        "label": "IWO Info",
+        "type": "folder",
+        "enabled": False,
+        "path": IWO_DIR
     },
     "PO_file": {
         "label": "PO Info",
